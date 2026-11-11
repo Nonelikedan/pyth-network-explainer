@@ -1,2 +1,42 @@
-# pyth-network-explainer
-# 🔮 Pyth Network: Step-by-Step 3D Scrollytelling Explainer  An interactive, 3D scrollytelling web experience built from scratch to explain **Web3**, **Smart Contracts**, the **Oracle Problem**, and **Pyth Network’s Confidence Intervals** in accessible baby steps.  🔗 **Live Demo:** [Insert Vercel Link Here]  ---  ## ✨ What It Covers  Instead of a static wall of text, this guide uses a reactive 3D WebGL scene that morphs across 8 interactive chapters as you scroll:  1. **Web3 (The Blind Vault):** Introduces decentralized networks and the origin of the term "Web3." 2. **The Smart Contract:** Breaks down programmable money using Nick Szabo's classic vending machine analogy. 3. **The Blind Spot:** Explains why isolated blockchains cannot natively read real-world market prices and require an *oracle*. 4. **Enter Pyth Network:** Visualizes first-party market data streaming directly into the smart contract vault. 5. **The Single Price Myth:** Shows live/simulated price variations across major exchanges (Binance, Coinbase, Bybit) using orbiting 3D nodes. 6. **Market Chaos:** Demonstrates how widening exchange spreads during high volatility lead to unfair liquidations if an oracle forces a single price. 7. **The Confidence Interval:** Visualizes Pyth’s uncertainty band (`Price ± Confidence`) as a protective 3D torus shield, complete with an interactive **Market Stress Simulator**. 8. **Putting It Together:** A concise wrap-up of how smart contracts use Pyth's confidence intervals to manage risk.  ---  ## 🛠️ Tech Stack & Architecture  Built with zero heavy front-end frameworks—just clean, performant vanilla web standards and creative coding libraries:  * **[Three.js (r128)](https://threejs.org/):** Renders the 3D background canvas (`#gl`), including the morphing wireframe vault, central price sphere, confidence torus shield, orbiting exchange nodes, and additive-blended data particle streams. * **[GSAP + ScrollTrigger](https://gsap.com/):** Drives the declarative chapter state machine (`S` and `cur`), smoothly interpolating 3D object scales, RGB colors, camera parallax, and the top scroll progress bar. * **[Anime.js](https://animejs.com/):** Handles 2D DOM micro-animations, kinetic typography word reveals, and smooth number tweening for the ETH/USD tickers and exchange boards. * **[Pyth Hermes API v2](https://hermes.pyth.network/):** Fetches real-time `ETH/USD` price and confidence interval updates (`0xff61491a...`), paired with an `AbortController` timeout and automatic fallback simulation if the client is offline or rate-limited. * **Accessibility First:** Respects `prefers-reduced-motion` (`RM`) to disable camera parallax and heavy rotations for motion-sensitive users.  ---  ## 📂 Project Structure  ```text ├── index.html   # Semantic chapter layout, embedded base64 Pyth logo, and CDN imports ├── style.css    # Dark-mode Pyth aesthetic (#0a0a0e & #bb66ff), glassmorphism cards, responsive layout ├── app.js       # Three.js scene, declarative state machine, Hermes v2 API polling, and ScrollTrigger logic └── README.md    # Project documentation
+🔮 Pyth Network: Step-by-Step 3D Scrollytelling Explainer
+
+An interactive, 3D scrollytelling web experience built from scratch to explain **Web3**, **Smart Contracts**, the **Oracle Problem**, and **Pyth Network’s Confidence Intervals** in accessible baby steps.
+
+🔗 Live Demo: [https://vercel.com/nonelikedan/pyth-network-explainer]
+
+---
+
+## What It Covers
+
+Instead of a static wall of text, this guide uses a reactive 3D WebGL scene that morphs across 8 interactive chapters as you scroll:
+
+1. **Web3 (The Blind Vault):** Introduces decentralized networks and the origin of the term "Web3."
+2. **The Smart Contract:** Breaks down programmable money using Nick Szabo's classic vending machine analogy.
+3. **The Blind Spot:** Explains why isolated blockchains cannot natively read real-world market prices and require an *oracle*.
+4. **Enter Pyth Network:** Visualizes first-party market data streaming directly into the smart contract vault.
+5. **The Single Price Myth:** Shows live/simulated price variations across major exchanges (Binance, Coinbase, Bybit) using orbiting 3D nodes.
+6. **Market Chaos:** Demonstrates how widening exchange spreads during high volatility lead to unfair liquidations if an oracle forces a single price.
+7. **The Confidence Interval:** Visualizes Pyth’s uncertainty band (`Price ± Confidence`) as a protective 3D torus shield, complete with an interactive **Market Stress Simulator**.
+8. **Putting It Together:** A concise wrap-up of how smart contracts use Pyth's confidence intervals to manage risk.
+
+---
+
+##  Tech Stack & Architecture
+
+Built with zero heavy front-end frameworks—just clean, performant vanilla web standards and creative coding libraries:
+
+* **[Three.js (r128)](https://threejs.org/):** Renders the 3D background canvas (`#gl`), including the morphing wireframe vault, central price sphere, confidence torus shield, orbiting exchange nodes, and additive-blended data particle streams.
+* **[GSAP + ScrollTrigger](https://gsap.com/):** Drives the declarative chapter state machine (`S` and `cur`), smoothly interpolating 3D object scales, RGB colors, camera parallax, and the top scroll progress bar.
+* **[Anime.js](https://animejs.com/):** Handles 2D DOM micro-animations, kinetic typography word reveals, and smooth number tweening for the ETH/USD tickers and exchange boards.
+* **[Pyth Hermes API v2](https://hermes.pyth.network/):** Fetches real-time `ETH/USD` price and confidence interval updates (`0xff61491a...`), paired with an `AbortController` timeout and automatic fallback simulation if the client is offline or rate-limited.
+* **Accessibility First:** Respects `prefers-reduced-motion` (`RM`) to disable camera parallax and heavy rotations for motion-sensitive users.
+
+---
+
+## 📂 Project Structure
+
+```text
+├── index.html   # Semantic chapter layout, embedded base64 Pyth logo, and CDN imports
+├── style.css    # Dark-mode Pyth aesthetic (#0a0a0e & #bb66ff), glassmorphism cards, responsive layout
+├── app.js       # Three.js scene, declarative state machine, Hermes v2 API polling, and ScrollTrigger logic
+└── README.md    # Project documentation
