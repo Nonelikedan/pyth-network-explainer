@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Pyth, step by step</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="style.css" />
+    <style></style>
+  </head>
+  <body>
+    <canvas id="gl"></canvas>
+    <div id="bar"></div>
+    <div id="chap"><i></i><span id="chapt">Web3</span></div>
+
+    <main>
+      <section class="step" data-s="vault" data-n="Web3">
+        <div class="card hero">
+          <h1 id="h1">The vault that can’t see the world</h1>
+          <p>
+            Web3 is an internet where the rules live on a shared network anyone
+            can check, with no company in the middle. It’s powerful, but it has
+            one big blind spot. Scroll to find out what it is and how Pyth fixes
+            it.
+          </p>
+          <p class="why">
+            Why “Web3”? Gavin Wood, a co-founder of Ethereum, coined it around
+            2014. Web1 was read-only, Web2 was read-and-write, and Web3 adds
+            <em>own</em>.
+          </p>
+          <div class="cue">Scroll ↓</div>
+        </div>
+      </section>
+
+      <section class="step" data-s="contract" data-n="The smart contract">
+        <div class="card right">
+          <span class="chip">Chapter 1</span>
+          <h2>The smart contract</h2>
+          <p>
+            Think of a vending machine. Put in the right coin, press the right
+            button, and the snack drops. No cashier decides anything. A smart
+            contract is that machine for money. You can program it to say
+            <em>“If Ethereum hits $4,000, unlock the funds.”</em>
+          </p>
+          <p class="why">
+            Computer scientist Nick Szabo coined “smart contract” in the 1990s.
+            His own example was a vending machine, which is why that analogy has
+            stuck.
+          </p>
+        </div>
+      </section>
+
+      <section class="step" data-s="blind" data-n="The blind spot">
+        <div class="card alert">
+          <span class="chip bad">The problem</span>
+          <h2>The blind spot</h2>
+          <p>
+            Picture a judge locked in a windowless room. The judge follows the
+            rules perfectly but can’t see outside. Our vault is the same: it
+            lives inside the blockchain and has no idea what Ethereum costs in
+            the real world. It needs a trusted messenger.
+          </p>
+          <p class="why">
+            That messenger is called an <em>oracle</em>, from the Latin
+            <em>orare</em>, “to speak.” Ancient Greeks traveled to Delphi to
+            hear a priestess speak for the god Apollo.
+          </p>
+        </div>
+      </section>
+
+      <section class="step" data-s="pyth" data-n="Enter Pyth">
+        <div class="card right glow">
+          <img
+            class="logo"
+            alt="Pyth logo"
+            src="data:image/jpeg;base64,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"
+          />
+          <h2>Enter Pyth Network</h2>
+          <p>
+            Pyth is the messenger. It pulls real-time prices straight from the
+            exchanges and trading firms that make the market, then streams them
+            into the vault.
+          </p>
+          <div class="box big" id="tk">ETH/USD $---.--</div>
+          <p class="why" style="margin-top: 1.2rem">
+            The priestess at Delphi was called the <em>Pythia</em>. Pyth is
+            named after her: an oracle that speaks the truth, this time about
+            prices.
+          </p>
+        </div>
+      </section>
+
+      <section class="step" data-s="myth" data-n="The single price myth">
+        <div class="card">
+          <span class="chip warn">The old way</span>
+          <h2>The single price myth</h2>
+          <p>
+            Many oracles hand a contract one exact price. But no asset trades at
+            the same price on every exchange at the same millisecond. Look at
+            the orbiting dots: each is an exchange.
+          </p>
+          <div class="box" id="b1"></div>
+        </div>
+      </section>
+
+      <section class="step" data-s="chaos" data-n="Market chaos">
+        <div class="card right alert">
+          <span class="chip bad">Market chaos</span>
+          <h2>When volatility spikes</h2>
+          <p>
+            In a crash the exchanges drift far apart. If an oracle forces one
+            price on-chain anyway, protocols get exploited and people are
+            liquidated at prices that were never fair.
+          </p>
+          <div class="box bad" id="b2"></div>
+        </div>
+      </section>
+
+      <section class="step" data-s="conf" data-n="The confidence interval">
+        <div class="card glow">
+          <span class="chip">The fix</span>
+          <h2>The confidence interval</h2>
+          <p>
+            Pyth publishes the price <em>and</em> how unsure it is right now.
+            You’ve seen this on a phone map: the blue dot sits inside a circle
+            that grows when GPS is weak. The purple ring around the sphere is
+            that circle.
+          </p>
+          <div class="box">
+            <span class="big">ETH $<span id="px">---.--</span></span>
+            <span class="big" id="ci">± $--.--</span>
+            <div class="track"><div id="band"></div></div>
+            <div class="sm" id="rg">Safe range: waiting for data…</div>
+          </div>
+          <div id="tag"></div>
+          <div id="sw">
+            <label class="sm" for="st">Simulate market stress</label
+            ><input id="st" type="range" min="0" max="100" value="10" />
+          </div>
+          <p class="why">
+            “Confident” comes from Latin <em>confidere</em>, “to trust fully.”
+            “Interval” comes from <em>inter vallum</em>, the space between two
+            ramparts: a range with walls on both sides.
+          </p>
+        </div>
+      </section>
+
+      <section class="step" data-s="end" data-n="Putting it together">
+        <div class="card mid">
+          <h2>Putting it together</h2>
+          <ul>
+            <li><b>Smart contract:</b> a vending machine for money</li>
+            <li>
+              <b>Oracle:</b> the messenger that tells it what’s true outside
+            </li>
+            <li><b>Pyth:</b> a messenger that also admits how sure it is</li>
+          </ul>
+          <p style="margin-top: 1.4rem">
+            Contracts that know the uncertainty can pause, widen safety margins
+            or refuse a risky trade, instead of acting on a price that was never
+            exact.
+          </p>
+          <button id="again">Replay from the top</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

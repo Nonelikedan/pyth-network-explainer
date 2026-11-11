@@ -1,0 +1,291 @@
+:root {
+        --bg: #0a0a0e;
+        --ink: #fff;
+        --soft: #c9c9d6;
+        --pyth: #bb66ff;
+        --warn: #ffcc00;
+        --bad: #ff4d4d;
+        --cool: #66b3ff;
+        color-scheme: dark;
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Outfit", system-ui, sans-serif;
+        overflow-x: hidden;
+      }
+      #gl {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: -1;
+      }
+      #bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--cool), var(--pyth));
+        transform: scaleX(0);
+        transform-origin: left;
+        z-index: 5;
+      }
+      #chap {
+        position: fixed;
+        top: calc(14px + env(safe-area-inset-top, 0px));
+        left: 5%;
+        font-size: 0.9rem;
+        color: var(--soft);
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      #chap i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--pyth);
+        box-shadow: 0 0 12px var(--pyth);
+      }
+      .step {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        padding: 0 7%;
+      }
+      .card {
+        max-width: 540px;
+        background: rgba(18, 18, 28, 0.62);
+        padding: 2.6rem;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(12px);
+        opacity: 0.3;
+        transition:
+          opacity 0.6s,
+          border-color 0.6s,
+          box-shadow 0.6s;
+      }
+      .step.on .card {
+        opacity: 1;
+      }
+      .right {
+        margin-left: auto;
+      }
+      .mid {
+        margin: 0 auto;
+        text-align: center;
+      }
+      .chip {
+        display: inline-block;
+        padding: 0.28rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        margin-bottom: 1rem;
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .chip.warn {
+        background: var(--warn);
+        color: #000;
+      }
+      .chip.bad {
+        background: var(--bad);
+      }
+      h1 {
+        font-size: clamp(2.8rem, 8vw, 5.6rem);
+        line-height: 0.98;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        margin-bottom: 1.4rem;
+      }
+      h2 {
+        font-size: clamp(1.9rem, 4vw, 2.5rem);
+        line-height: 1.1;
+        margin-bottom: 1rem;
+        font-weight: 700;
+      }
+      .w {
+        display: inline-block;
+        overflow: hidden;
+        vertical-align: top;
+        padding-right: 0.18em;
+      }
+      .wi {
+        display: inline-block;
+      }
+      p {
+        font-size: 1.08rem;
+        line-height: 1.65;
+        color: var(--soft);
+        font-weight: 300;
+        margin-bottom: 1.2rem;
+      }
+      em {
+        color: #fff;
+        font-style: normal;
+        font-weight: 500;
+      }
+      .why {
+        font-family: "Instrument Serif", serif;
+        font-style: italic;
+        font-size: 1.15rem;
+        line-height: 1.45;
+        color: #e6d3ff;
+        border-left: 2px solid var(--pyth);
+        padding-left: 1rem;
+        margin-top: 0.4rem;
+      }
+      .hero {
+        max-width: 720px;
+        background: none;
+        border: 0;
+        backdrop-filter: none;
+        padding: 0;
+        opacity: 1;
+      }
+      .hero p {
+        font-size: 1.25rem;
+        max-width: 520px;
+      }
+      .cue {
+        margin-top: 2rem;
+        color: var(--soft);
+        font-size: 0.95rem;
+      }
+      .alert {
+        border-color: var(--bad);
+        box-shadow: 0 0 36px rgba(255, 77, 77, 0.18);
+      }
+      .alert h2 {
+        color: var(--bad);
+      }
+      .glow {
+        border-color: var(--pyth);
+        box-shadow: 0 0 44px rgba(187, 102, 255, 0.22);
+      }
+      .glow h2 {
+        color: var(--pyth);
+      }
+      .logo {
+        width: 58px;
+        height: 58px;
+        border-radius: 14px;
+        margin-bottom: 1rem;
+        box-shadow: 0 0 22px rgba(187, 102, 255, 0.55);
+      }
+      .box {
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 10px;
+        padding: 1rem 1.1rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .big {
+        font-size: clamp(1.5rem, 4.4vw, 2rem);
+        font-weight: 700;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.35rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 1.05rem;
+      }
+      .row:last-child {
+        border: 0;
+      }
+      .row span:first-child {
+        color: var(--soft);
+      }
+      .bad .row b {
+        color: #ff8a8a;
+      }
+      #ci {
+        color: var(--pyth);
+        text-shadow: 0 0 10px rgba(187, 102, 255, 0.7);
+      }
+      .track {
+        height: 10px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        margin: 0.9rem 0 0.3rem;
+        position: relative;
+      }
+      #band {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 14%;
+        transform: translateX(-50%);
+        background: var(--pyth);
+        border-radius: 6px;
+        box-shadow: 0 0 14px var(--pyth);
+      }
+      .sm {
+        font-size: 0.9rem;
+        color: var(--soft);
+      }
+      #tag {
+        font-size: 0.85rem;
+        color: var(--soft);
+        margin: 0.7rem 0 1rem;
+      }
+      #tag b {
+        color: var(--pyth);
+      }
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--pyth);
+        margin: 0.4rem 0 1.1rem;
+      }
+      button {
+        font: inherit;
+        font-weight: 500;
+        color: #0a0a0e;
+        background: var(--pyth);
+        border: 0;
+        border-radius: 30px;
+        padding: 0.7rem 1.4rem;
+        cursor: pointer;
+      }
+      :focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 3px;
+      }
+      ul {
+        list-style: none;
+      }
+      li {
+        padding: 0.6rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        color: var(--soft);
+        font-size: 1.05rem;
+      }
+      li b {
+        color: #fff;
+        font-weight: 500;
+      }
+      @media (max-width: 700px) {
+        .step {
+          padding: 0 5%;
+        }
+        .card {
+          padding: 1.7rem;
+        }
+        .right {
+          margin-left: 0;
+        }
+      }
