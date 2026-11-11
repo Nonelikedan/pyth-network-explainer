@@ -269,13 +269,15 @@ async function pull() {
   try {
     const c = new AbortController();
     setTimeout(() => c.abort(), 2500);
-    const r = await fetch(
-      `https://hermes.pyth.network/v2/updates/price/latest?ids[]=${ETH}&parsed=true`,
-      { cache: "no-store", signal: c.signal },
-    );
-    const p = (await r.json()).parsed[0].price;
-    base = +p.price * 10 ** p.expo;
-    conf = +p.conf * 10 ** p.expo;
+    // Our own Vercel function (api/price.js) calls Hermes with the secret key
+    const r = await fetch("/api/price", {
+      cache: "no-store",
+      signal: c.signal,
+    });
+    if (!r.ok) throw new Error("price endpoint " + r.status);
+    const d = await r.json();
+    base = d.price;
+    conf = d.conf;
     live = true;
     stress = Math.min(Math.max(((conf / base) * 1e4 - 1) / 12, 0), 1);
   } catch (e) {
@@ -290,7 +292,7 @@ const disp = { p: 0, c: 0 };
 function render() {
   $("#sw").style.display = live ? "none" : "block";
   $("#tag").innerHTML = live
-    ? "<b>●</b> Live from Pyth Hermes"
+    ? "<b>●</b> Live from Pyth"
     : "<b>●</b> Simulated data (live feed unreachable here)";
   anime.remove(disp);
   anime({
