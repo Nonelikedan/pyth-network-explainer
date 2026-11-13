@@ -66,6 +66,127 @@ const stM = new THREE.PointsMaterial({
 });
 scene.add(new THREE.Points(stg, stM));
 
+/* ---------- After the Bell: a 24h dial ---------- */
+const DIAL_R = 1.8,
+  U = 0.036; // U = world height of "1x" (the usual hour)
+// 20:00 UTC sits at 12 o'clock; hours run clockwise
+const ang = (h) => Math.PI / 2 - ((h - 20) / 24) * Math.PI * 2;
+const at = (h, r) => [Math.cos(ang(h)) * r, Math.sin(ang(h)) * r];
+
+const dial = new THREE.Group();
+grp.add(dial); // child of grp, so it moves with the chapter's x position
+
+// 24 hour ticks (no data, just the clock face)
+const tickM = new THREE.MeshBasicMaterial({
+  color: 0x8888aa,
+  transparent: true,
+});
+for (let h = 0; h < 24; h++) {
+  const tk = new THREE.Mesh(
+    new THREE.BoxGeometry(0.03, h === 20 ? 0.34 : 0.16, 0.03),
+    tickM,
+  );
+  tk.position.set(...at(h, DIAL_R));
+  tk.rotation.z = ang(h) - Math.PI / 2; // point the long side outward
+  dial.add(tk);
+}
+
+// SpaceX: tall bar = 56x, short bar = 1x (the usual 20:00 UTC hour)
+const towerM = new THREE.MeshBasicMaterial({
+  color: 0xffcc00,
+  transparent: true,
+});
+const stubM = new THREE.MeshBasicMaterial({
+  color: 0x8888aa,
+  transparent: true,
+});
+const barGeo = new THREE.BoxGeometry(0.16, 1, 0.16).translate(0, 0.5, 0); // base sits at y = 0
+const tower = new THREE.Mesh(barGeo, towerM);
+const stub = new THREE.Mesh(barGeo, stubM);
+tower.position.set(0, DIAL_R, 0);
+stub.position.set(-0.3, Math.sqrt(DIAL_R ** 2 - 0.09), 0);
+dial.add(tower, stub);
+
+// Brazil: beads along the 20:00 Sun -> 13:00 Mon window (17 hours)
+const M = 120;
+const arcPos = new Float32Array(M * 3);
+for (let i = 0; i < M; i++)
+  arcPos.set([...at(20 + (17 * i) / (M - 1), DIAL_R - 0.28), 0], i * 3);
+const arcG = new THREE.BufferGeometry();
+arcG.setAttribute("position", new THREE.BufferAttribute(arcPos, 3));
+const arcM = new THREE.PointsMaterial({
+  size: 0.09,
+  color: 0xbb66ff,
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+dial.add(new THREE.Points(arcG, arcM));
+const head = new THREE.Mesh(
+  new THREE.SphereGeometry(0.12, 12, 12),
+  new THREE.MeshBasicMaterial({ color: 0xffffff }),
+); // bright bead at the front of the trail
+dial.add(head);
+
+// the "bell ringing" pulse
+const pulseM = new THREE.MeshBasicMaterial({
+  color: 0xffcc00,
+  transparent: true,
+  side: THREE.DoubleSide,
+});
+const pulse = new THREE.Mesh(
+  new THREE.RingGeometry(DIAL_R - 0.015, DIAL_R + 0.015, 96),
+  pulseM,
+);
+dial.add(pulse);
+
+/* ---------- Where the Liquidity Lives + The Business of Data: honest bar charts ---------- */
+const BASE_Y = -1.6; // the baseline both bar charts stand on
+const mkBar = (color) => {
+  const m = new THREE.MeshBasicMaterial({ color, transparent: true });
+  // base sits at y = 0, so scale.y grows the bar upward from the baseline
+  const geo = new THREE.BoxGeometry(0.8, 1, 0.8).translate(0, 0.5, 0);
+  return [new THREE.Mesh(geo, m), m];
+};
+const mkFloor = (w) => {
+  const m = new THREE.MeshBasicMaterial({ color: 0x8888aa, transparent: true });
+  return [new THREE.Mesh(new THREE.BoxGeometry(w, 0.03, 1.2), m), m];
+};
+
+// Perps vs spot: heights follow $122.1B : $1.95B exactly
+const LIQ_H = 3.2;
+const liqG = new THREE.Group();
+liqG.position.y = BASE_Y;
+grp.add(liqG);
+const [perps, perpsM] = mkBar(0xbb66ff),
+  [spot, spotM] = mkBar(0x8888aa);
+perps.position.x = -0.7;
+spot.position.x = 0.7;
+const [liqFloor, liqFloorM] = mkFloor(2.8);
+liqG.add(perps, spot, liqFloor);
+
+// ARR: Aug / Sep / Oct in $M, drawn from zero so growth isn't exaggerated
+const ARR = [10.39, 11.49, 13.67],
+  ARR_U = 3 / 13.67;
+const arrG = new THREE.Group();
+arrG.position.y = BASE_Y;
+grp.add(arrG);
+const arrBars = [],
+  arrMs = [];
+[0x7a4aa8, 0x9a58d6, 0xbb66ff].forEach((c, i) => {
+  const [b, m] = mkBar(c);
+  b.position.x = (i - 1) * 1.1;
+  arrG.add(b);
+  arrBars.push(b);
+  arrMs.push(m);
+});
+const [arrFloor, arrFloorM] = mkFloor(3.8);
+arrG.add(arrFloor);
+liqG.visible = arrG.visible = false;
+
+// Defaults for every chapter-specific key, so older chapters hide these objects automatically
+const ZERO = { bell: 0, arc: 0, tower: 0, liq: 0, arr: 0 };
+
 // Each chapter is just a set of target numbers. GSAP tweens "cur" toward them.
 const S = {
   vault: {
@@ -159,6 +280,50 @@ const S = {
     g: 0.4,
     b: 1,
   },
+  bell: {
+    x: -2.4,
+    cube: 0,
+    core: 0.45,
+    shield: 0,
+    stream: 0,
+    ex: 0,
+    spread: 0,
+    shake: 0,
+    r: 0.73,
+    g: 0.4,
+    b: 1,
+    bell: 1,
+    arc: 1,
+    tower: 1,
+  },
+  liq: {
+    x: 2.4,
+    cube: 0,
+    core: 0,
+    shield: 0,
+    stream: 0,
+    ex: 0,
+    spread: 0,
+    shake: 0,
+    r: 0.73,
+    g: 0.4,
+    b: 1,
+    liq: 1,
+  },
+  arr: {
+    x: -2.4,
+    cube: 0,
+    core: 0,
+    shield: 0,
+    stream: 0,
+    ex: 0,
+    spread: 0,
+    shake: 0,
+    r: 0.73,
+    g: 0.4,
+    b: 1,
+    arr: 1,
+  },
   end: {
     x: 0,
     cube: 0,
@@ -173,14 +338,28 @@ const S = {
     b: 1,
   },
 };
-const cur = { ...S.vault };
+const cur = { ...ZERO, ...S.vault };
 let stress = 0.1,
   last = "vault";
+// Keys that rise AFTER the main move, with their own delay/duration.
+// All use non-overshooting eases so a bar can never show more than its true value.
+const SEQ = {
+  tower: { delay: 0.6, dur: 1.2, ease: "power3.out" }, // the bell rings first...
+  arc: { delay: 1.4, dur: 3, ease: "power1.inOut" }, // ...then the night sweeps round
+  liq: { delay: 0.6, dur: 1.6, ease: "power3.out" },
+  arr: { delay: 0.6, dur: 2.4, ease: "power2.inOut" },
+};
 function setState(name) {
   last = name;
-  const t = { ...S[name] },
-    sh = t.shield;
+  const t = { ...ZERO, ...S[name] }; // missing keys fall back to 0
+  const sh = t.shield;
   delete t.shield;
+  const seq = {};
+  for (const k in SEQ) {
+    seq[k] = t[k];
+    delete t[k];
+  }
+
   gsap.to(cur, {
     ...t,
     duration: 1.3,
@@ -194,6 +373,16 @@ function setState(name) {
     ease: sh > cur.shield ? "elastic.out(1,0.5)" : "power2.out",
     overwrite: "auto",
   });
+  for (const k in SEQ) {
+    const up = seq[k] > cur[k];
+    gsap.to(cur, {
+      [k]: seq[k],
+      duration: up ? SEQ[k].dur : 0.4,
+      delay: up ? SEQ[k].delay : 0,
+      ease: up ? SEQ[k].ease : "power2.out",
+      overwrite: "auto",
+    });
+  }
 }
 const off = [0.4, 2.2, 1.3];
 const clock = new THREE.Clock();
@@ -208,7 +397,7 @@ function frame() {
   shield.rotation.y = t * 0.5 * k;
   stars.rotation.y = t * 0.01 * k;
   grp.position.set(
-    cur.x + (Math.random() - 0.5) * 0.16 * cur.shake * k,
+    cur.x * xs + (Math.random() - 0.5) * 0.16 * cur.shake * k,
     (Math.random() - 0.5) * 0.16 * cur.shake * k,
     0,
   );
@@ -230,18 +419,53 @@ function frame() {
     );
     n.scale.setScalar(Math.max(cur.ex, 1e-4));
   });
+  // --- After the Bell ---
+  dial.visible = cur.bell > 0.01;
+  dial.scale.setScalar(Math.max(cur.bell, 1e-4));
+  tickM.opacity = 0.8 * cur.bell;
+  tower.scale.y = Math.max(cur.tower * 56 * U, 1e-4); // 56x the usual hour
+  stub.scale.y = Math.max(cur.tower * U, 1e-4); // 1x
+  towerM.opacity = stubM.opacity = Math.min(cur.tower, 1);
+  const shown = Math.floor(cur.arc * (M - 1));
+  arcG.setDrawRange(0, cur.arc > 0.001 ? shown + 1 : 0); // reveal beads in order
+  arcM.opacity = cur.bell;
+  head.visible = cur.arc > 0.01;
+  head.position.set(arcPos[shown * 3], arcPos[shown * 3 + 1], 0);
+  const p = (t * 0.35) % 1; // 0 -> 1 every ~3s
+  pulse.scale.setScalar(1 + p * 1.1);
+  pulseM.opacity = (1 - p) * 0.45 * Math.min(cur.tower, 1);
+  // --- Where the Liquidity Lives: perps vs spot, true 122.1 : 1.95 ratio ---
+  liqG.visible = cur.liq > 0.01;
+  liqG.rotation.y = Math.sin(t * 0.4) * 0.35 * k;
+  perps.scale.y = Math.max(cur.liq * LIQ_H, 1e-4);
+  spot.scale.y = Math.max(cur.liq * LIQ_H * (1.95 / 122.1), 1e-4);
+  perpsM.opacity = spotM.opacity = 0.9 * Math.min(cur.liq, 1);
+  liqFloorM.opacity = 0.6 * Math.min(cur.liq, 1);
+  // --- The Business of Data: ARR bars, starting from zero ---
+  arrG.visible = cur.arr > 0.01;
+  arrG.rotation.y = Math.sin(t * 0.4) * 0.35 * k;
+  ARR.forEach((v, i) => {
+    const g = Math.min(Math.max(cur.arr * 1.6 - i * 0.3, 0), 1); // bars rise one after another
+    arrBars[i].scale.y = Math.max(g * v * ARR_U, 1e-4);
+    arrMs[i].opacity = 0.9 * Math.min(cur.arr, 1);
+  });
+  arrFloorM.opacity = 0.6 * Math.min(cur.arr, 1);
   stM.opacity = cur.stream;
   for (let i = 0; i < N; i++) {
     const s = seed[i],
       p = (t * 0.22 + s.t) % 1;
-    sp[i * 3] = s.x + (cur.x - s.x) * p;
+    sp[i * 3] = s.x + (cur.x * xs - s.x) * p;
     sp[i * 3 + 1] = s.y * (1 - p);
     sp[i * 3 + 2] = s.z * (1 - p);
   }
   stg.attributes.position.needsUpdate = true;
   renderer.render(scene, camera);
 }
+let xs = 1; // 1 on desktop; 0 on phones so objects sit centred behind the card
 function resize() {
+  const narrow = innerWidth <= 700;
+  xs = narrow ? 0 : 1;
+  camera.position.z = narrow ? 8.5 : 7; // pull back a little so the dial and bars fit a portrait screen
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
