@@ -517,7 +517,7 @@ function render() {
   $("#sw").style.display = live ? "none" : "block";
   $("#tag").innerHTML = live
     ? "<b>●</b> Live from Pyth"
-    : "<b>●</b> Simulated data (live feed unreachable here)";
+    : "<b>●</b> Demo data. Drag the slider to see how the ring reacts";
   anime.remove(disp);
   anime({
     targets: disp,
