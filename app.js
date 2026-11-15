@@ -149,7 +149,7 @@ const mkBar = (color) => {
   return [new THREE.Mesh(geo, m), m];
 };
 const mkFloor = (w) => {
-  const m = new THREE.MeshBasicMaterial({ color: 0x8888aa, transparent: true });
+  const m = new THREE.MeshBasicMaterial({ color: 0x3a3a50, transparent: true });
   return [new THREE.Mesh(new THREE.BoxGeometry(w, 0.03, 1.2), m), m];
 };
 
@@ -159,7 +159,7 @@ const liqG = new THREE.Group();
 liqG.position.y = BASE_Y;
 grp.add(liqG);
 const [perps, perpsM] = mkBar(0xbb66ff),
-  [spot, spotM] = mkBar(0x8888aa);
+  [spot, spotM] = mkBar(0xc9c9d6); // light grey, so it stands out on the dark floor
 perps.position.x = -0.7;
 spot.position.x = 0.7;
 const [liqFloor, liqFloorM] = mkFloor(2.8);
@@ -185,7 +185,7 @@ arrG.add(arrFloor);
 liqG.visible = arrG.visible = false;
 
 // Defaults for every chapter-specific key, so older chapters hide these objects automatically
-const ZERO = { bell: 0, arc: 0, tower: 0, liq: 0, arr: 0 };
+const ZERO = { bell: 0, arc: 0, tower: 0, liq: 0, arr: 0, lift: 0 };
 
 // Each chapter is just a set of target numbers. GSAP tweens "cur" toward them.
 const S = {
@@ -309,6 +309,7 @@ const S = {
     g: 0.4,
     b: 1,
     liq: 1,
+    lift: 1.2, // phones: raise the baseline above the card
   },
   arr: {
     x: -2.4,
@@ -323,6 +324,7 @@ const S = {
     g: 0.4,
     b: 1,
     arr: 1,
+    lift: 1.2,
   },
   end: {
     x: 0,
@@ -398,7 +400,7 @@ function frame() {
   stars.rotation.y = t * 0.01 * k;
   grp.position.set(
     cur.x * xs + (Math.random() - 0.5) * 0.16 * cur.shake * k,
-    (Math.random() - 0.5) * 0.16 * cur.shake * k,
+    yo + ph * cur.lift + (Math.random() - 0.5) * 0.16 * cur.shake * k,
     0,
   );
   cube.scale.setScalar(Math.max(cur.cube, 1e-4));
@@ -455,16 +457,21 @@ function frame() {
     const s = seed[i],
       p = (t * 0.22 + s.t) % 1;
     sp[i * 3] = s.x + (cur.x * xs - s.x) * p;
-    sp[i * 3 + 1] = s.y * (1 - p);
+    sp[i * 3 + 1] = yo + s.y * (1 - p);
     sp[i * 3 + 2] = s.z * (1 - p);
   }
   stg.attributes.position.needsUpdate = true;
   renderer.render(scene, camera);
 }
-let xs = 1; // 1 on desktop; 0 on phones so objects sit centred behind the card
+let xs = 1, // 1 on desktop; 0 on phones so objects sit centred
+  yo = 0, // phones: lift the 3D scene up so it sits above the card
+  ph = 0; // 1 on phones, 0 on desktop (switches the per-chapter "lift" on)
 function resize() {
   const narrow = innerWidth <= 700;
   xs = narrow ? 0 : 1;
+  yo = narrow ? 1.7 : 0;
+  ph = narrow ? 1 : 0;
+  grp.scale.setScalar(narrow ? 0.85 : 1); // slightly smaller so the whole scene fits above the card
   camera.position.z = narrow ? 8.5 : 7; // pull back a little so the dial and bars fit a portrait screen
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
@@ -655,6 +662,32 @@ document.addEventListener("visibilitychange", () => {
     voice.play().catch(() => {});
 });
 
+/* ---------- 3c. Chapter dots: click to jump to any chapter ---------- */
+const rail = document.createElement("nav");
+rail.id = "rail";
+rail.setAttribute("aria-label", "Chapters");
+const dots = {};
+document.querySelectorAll(".step").forEach((s) => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.setAttribute("aria-label", s.dataset.n);
+  b.dataset.label = s.dataset.n; // shown as a tooltip by the CSS
+  b.addEventListener("click", () =>
+    s.scrollIntoView({ behavior: RM ? "auto" : "smooth", block: "start" }),
+  );
+  rail.appendChild(b);
+  dots[s.dataset.s] = b;
+});
+document.body.appendChild(rail);
+function setDot(name) {
+  for (const k in dots) {
+    dots[k].classList.toggle("on", k === name);
+    if (k === name) dots[k].setAttribute("aria-current", "step");
+    else dots[k].removeAttribute("aria-current");
+  }
+}
+setDot("vault");
+
 /* ---------- 3. Scroll storytelling ---------- */
 document.querySelectorAll(".step").forEach((s) => {
   ScrollTrigger.create({
@@ -669,6 +702,7 @@ document.querySelectorAll(".step").forEach((s) => {
 function go(s) {
   setState(s.dataset.s);
   narrChapter = s.dataset.s;
+  setDot(s.dataset.s);
   if (narrOn) {
     // wait a moment so fast scrolling past a chapter doesn't start its clip
     clearTimeout(narrT);
