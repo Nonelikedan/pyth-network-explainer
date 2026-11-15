@@ -578,6 +578,83 @@ function updBoard(el) {
 pull();
 setInterval(pull, 2000);
 
+/* ---------- 3b. Narration: one clip per chapter, played as you scroll ---------- */
+// data-s of each chapter -> its file in /audio. The hero is silent; "contract" is the first spoken chapter.
+const CLIPS = {
+  contract: "contract.mp3",
+  blind: "blind.mp3",
+  pyth: "pyth.mp3",
+  myth: "myth.mp3",
+  chaos: "chaos.mp3",
+  conf: "conf.mp3",
+  bell: "bell.mp3",
+  liq: "liq.mp3",
+  arr: "arr.mp3",
+  end: "end.mp3",
+};
+const FOLLOW = { end: "sources.mp3" }; // plays right after the recap clip
+
+// ONE audio element, reused for every clip. Phones only unlock audio for an
+// element the user has tapped, so a new Audio() per chapter would stay muted.
+const voice = new Audio();
+const narrBtn = $("#narrBtn"),
+  narrAgain = $("#narrAgain");
+let narrOn = false,
+  narrChapter = "vault",
+  narrT,
+  token = 0,
+  queue = [];
+
+function playNext(my) {
+  if (my !== token) return; // a newer request replaced this one
+  const f = queue.shift();
+  if (!f) return;
+  voice.src = "audio/" + f;
+  voice.volume = 1;
+  voice.play().catch(() => {});
+}
+voice.addEventListener("ended", () => playNext(token)); // chains recap -> sources
+
+function playChapter(name) {
+  if (!CLIPS[name]) return; // no clip here: let the current one finish
+  const my = ++token;
+  queue = [CLIPS[name], FOLLOW[name]].filter(Boolean);
+  gsap.killTweensOf(voice);
+  if (voice.paused) return playNext(my);
+  // fade the old clip out instead of cutting it mid-word
+  gsap.to(voice, {
+    volume: 0,
+    duration: 0.3,
+    onComplete: () => {
+      voice.pause();
+      playNext(my);
+    },
+  });
+}
+function stopVoice() {
+  token++;
+  clearTimeout(narrT);
+  gsap.killTweensOf(voice);
+  gsap.to(voice, { volume: 0, duration: 0.3, onComplete: () => voice.pause() });
+}
+function setNarr(on) {
+  narrOn = on;
+  narrBtn.setAttribute("aria-pressed", String(on));
+  narrBtn.textContent = on ? "\u275A\u275A Narration on" : "\u25B6 Listen as you scroll";
+  narrAgain.hidden = !on;
+  if (!on) stopVoice();
+}
+narrBtn.addEventListener("click", () => {
+  setNarr(!narrOn);
+  if (narrOn) playChapter(narrChapter); // runs inside the tap, so phones allow it
+});
+narrAgain.addEventListener("click", () => playChapter(narrChapter));
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) voice.pause();
+  else if (narrOn && voice.src && !voice.ended && voice.currentTime > 0)
+    voice.play().catch(() => {});
+});
+
 /* ---------- 3. Scroll storytelling ---------- */
 document.querySelectorAll(".step").forEach((s) => {
   ScrollTrigger.create({
@@ -591,6 +668,12 @@ document.querySelectorAll(".step").forEach((s) => {
 });
 function go(s) {
   setState(s.dataset.s);
+  narrChapter = s.dataset.s;
+  if (narrOn) {
+    // wait a moment so fast scrolling past a chapter doesn't start its clip
+    clearTimeout(narrT);
+    narrT = setTimeout(() => playChapter(narrChapter), 350);
+  }
   $("#chapt").textContent = s.dataset.n;
   if (s.dataset.s === "pyth" && !tkReady) {
     const o = { v: 0 };

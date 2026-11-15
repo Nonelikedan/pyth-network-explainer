@@ -297,3 +297,40 @@ li b {
 .src a {
   color: var(--pyth);
 }
+
+#narr {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(18, 18, 28, 0.82);
+  border: 1px solid rgba(187, 102, 255, 0.5);
+  backdrop-filter: blur(12px);
+  border-radius: 30px;
+  padding: 0.3rem;
+  white-space: nowrap;
+}
+#narr button {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #fff;
+  background: transparent;
+  border: 0;
+  border-radius: 24px;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+}
+#narr #narrBtn[aria-pressed="true"] {
+  background: var(--pyth);
+  color: #0a0a0e;
+}
+#narr .credit {
+  font-size: 0.72rem;
+  color: var(--soft);
+  padding: 0 0.8rem 0 0.2rem;
+}
