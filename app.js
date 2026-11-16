@@ -387,6 +387,8 @@ function setState(name) {
   }
 }
 const off = [0.4, 2.2, 1.3];
+let lastP = 0,
+  onPulse = null; // sound hook: fires each time the bell chapter's pulse ring restarts
 const clock = new THREE.Clock();
 function frame() {
   requestAnimationFrame(frame);
@@ -434,6 +436,8 @@ function frame() {
   head.visible = cur.arc > 0.01;
   head.position.set(arcPos[shown * 3], arcPos[shown * 3 + 1], 0);
   const p = (t * 0.35) % 1; // 0 -> 1 every ~3s
+  if (p < lastP && onPulse) onPulse(); // the ring just restarted
+  lastP = p;
   pulse.scale.setScalar(1 + p * 1.1);
   pulseM.opacity = (1 - p) * 0.45 * Math.min(cur.tower, 1);
   // --- Where the Liquidity Lives: perps vs spot, true 122.1 : 1.95 ratio ---
@@ -647,7 +651,7 @@ function stopVoice() {
 function setNarr(on) {
   narrOn = on;
   narrBtn.setAttribute("aria-pressed", String(on));
-  narrBtn.textContent = on ? "\u275A\u275A Narration on" : "\u25B6 Listen as you scroll";
+  narrBtn.textContent = on ? "\u275A\u275A Sound on" : "\u25B6 Listen as you scroll";
   narrAgain.hidden = !on;
   if (!on) stopVoice();
 }
@@ -660,6 +664,259 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) voice.pause();
   else if (narrOn && voice.src && !voice.ended && voice.currentTime > 0)
     voice.play().catch(() => {});
+});
+
+/* ---------- 3d. Sound design: synthesized live, timed to each chapter's animation ---------- */
+// No audio files: every sound is built with the Web Audio API. The times inside each cue
+// match the GSAP tweens in SEQ (delay + duration), so a rising tone peaks exactly when its bar lands.
+let ac,
+  duck,
+  cueBus,
+  noiseBuf,
+  sfxOn = false,
+  sfxWanted = true,
+  sfxT;
+const sfxBtn = $("#sfxBtn");
+
+function audioCtx() {
+  if (!ac) {
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    const master = ac.createGain();
+    master.gain.value = 1.2; // effects sit under the narrator, which is ducked further while it speaks
+    const comp = ac.createDynamicsCompressor(); // keeps layered sounds from clipping
+    duck = ac.createGain(); // lowered while the voice is speaking
+    duck.connect(master);
+    master.connect(comp);
+    comp.connect(ac.destination);
+    // 2 seconds of white noise, reused for whooshes, ticks and rumbles
+    noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (ac.state === "suspended") ac.resume().catch(() => {});
+  return ac;
+}
+
+// one pitched sound: a pitch glide (f -> to) and a volume envelope (attack, then decay)
+function tone(f, t, dur, o = {}) {
+  const { type = "sine", gain = 0.15, attack = 0.01, to = f } = o;
+  t = Math.max(t, ac.currentTime + 0.005);
+  const osc = ac.createOscillator(),
+    g = ac.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(f, t);
+  if (to !== f) osc.frequency.exponentialRampToValueAtTime(to, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain, t + Math.min(attack, dur * 0.9));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(g);
+  g.connect(cueBus);
+  osc.start(t);
+  osc.stop(t + dur + 0.05);
+}
+// filtered noise: whooshes (sweeping filter), clicks (short), rumbles (low filter)
+function noise(t, dur, o = {}) {
+  const { gain = 0.05, f0 = 800, f1 = 800, q = 1, attack = 0.02 } = o;
+  t = Math.max(t, ac.currentTime + 0.005);
+  const src = ac.createBufferSource(),
+    bp = ac.createBiquadFilter(),
+    g = ac.createGain();
+  src.buffer = noiseBuf;
+  src.loop = true;
+  bp.type = "bandpass";
+  bp.Q.value = q;
+  bp.frequency.setValueAtTime(f0, t);
+  bp.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain, t + Math.min(attack, dur * 0.9));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(bp);
+  bp.connect(g);
+  g.connect(cueBus);
+  src.start(t);
+  src.stop(t + dur + 0.05);
+}
+// a bell is several inharmonic partials with different decay times
+function bellStrike(f, t, gain) {
+  [
+    [1, 1, 2.8],
+    [2, 0.6, 2.2],
+    [2.76, 0.5, 1.6],
+    [5.4, 0.25, 1.1],
+    [8.93, 0.12, 0.7],
+  ].forEach(([r, a, d]) => tone(f * r, t, d, { gain: gain * a, attack: 0.004 }));
+}
+const chord = (fs, t, dur, gain) =>
+  fs.forEach((f, i) =>
+    tone(f, t + i * 0.04, dur, {
+      gain,
+      attack: dur * 0.35,
+      type: i % 2 ? "triangle" : "sine",
+    }),
+  );
+const tick = (t, f) => {
+  noise(t, 0.05, { gain: 0.1, f0: f, f1: f, q: 6, attack: 0.002 });
+  tone(f, t, 0.08, { gain: 0.04, attack: 0.002 });
+};
+// power1.inOut run backwards: given how far a tween has progressed (0-1), when was that (0-1)?
+const inv1 = (p) => (p < 0.5 ? Math.sqrt(p / 2) : 1 - Math.sqrt((1 - p) / 2));
+
+const CUES = {
+  contract: (t) => {
+    // a coin dropping into a vending machine
+    tone(2093, t, 0.5, { gain: 0.1, type: "triangle", attack: 0.003 });
+    tone(2637, t + 0.14, 0.6, { gain: 0.08, type: "triangle", attack: 0.003 });
+    tone(130, t + 0.4, 0.3, { gain: 0.22, to: 55, attack: 0.005 }); // the clunk
+  },
+  blind: (t) => {
+    // a hollow drone from two notes that don't quite agree
+    tone(82.4, t, 3.2, { gain: 0.13, attack: 1.2 });
+    tone(87.3, t, 3.2, { gain: 0.1, attack: 1.2 });
+    noise(t, 3.2, { gain: 0.025, f0: 220, f1: 110, q: 0.7, attack: 1.2 });
+  },
+  pyth: (t) => {
+    // data streaming in: a rising arpeggio over a shimmer
+    [392, 494, 587, 740, 988].forEach((f, i) =>
+      tone(f, t + 0.2 + i * 0.13, 0.9, {
+        gain: 0.1,
+        type: "triangle",
+        attack: 0.005,
+      }),
+    );
+    noise(t + 0.1, 1.4, { gain: 0.03, f0: 500, f1: 3500, q: 1.2, attack: 0.7 });
+  },
+  myth: (t) => {
+    // three exchanges, three slightly different "prices": notes just out of tune
+    [440, 446, 433].forEach((f, i) =>
+      tone(f, t + 0.3 + i * 0.22, 1.6, { gain: 0.12, attack: 0.01 }),
+    );
+  },
+  chaos: (t) => {
+    // a heartbeat that speeds up as the exchanges drift apart
+    let at = 0.1,
+      gap = 0.55;
+    for (let i = 0; i < 16; i++) {
+      tone(72, t + at, 0.2, { gain: 0.22, to: 42, attack: 0.005 });
+      noise(t + at, 0.1, {
+        gain: 0.04,
+        f0: 3000,
+        f1: 800,
+        q: 2,
+        attack: 0.003,
+      });
+      at += gap;
+      gap = Math.max(0.12, gap * 0.85);
+    }
+    // a rising hiss underneath = tension
+    noise(t, at, { gain: 0.04, f0: 300, f1: 2500, q: 0.8, attack: at * 0.8 });
+  },
+  conf: (t) => {
+    // the tension resolves as the ring springs into place
+    tone(110, t, 1.4, { gain: 0.2, to: 220, attack: 0.9 });
+    chord([220, 277.2, 329.6, 440], t + 0.3, 3, 0.06);
+    bellStrike(880, t + 0.35, 0.06);
+  },
+  bell: (t) => {
+    // riser -> strike when the tower peaks (1.8s) -> one tick per hour as the trail sweeps (1.4s to 4.4s)
+    tone(180, t + 0.6, 1.2, {
+      gain: 0.14,
+      to: 900,
+      type: "triangle",
+      attack: 1.1,
+    });
+    noise(t + 0.6, 1.2, {
+      gain: 0.06,
+      f0: 400,
+      f1: 4500,
+      q: 0.8,
+      attack: 1.1,
+    });
+    bellStrike(523.25, t + 1.8, 0.2);
+    for (let h = 0; h <= 17; h++)
+      tick(t + 1.4 + 3 * inv1(h / 17), 700 + h * 70);
+  },
+  liq: (t) => {
+    // a low rumble builds as the tall bar grows... and spot is a tiny tick
+    tone(55, t + 0.6, 1.7, { gain: 0.26, to: 110, attack: 1.4 });
+    noise(t + 0.6, 1.7, { gain: 0.05, f0: 90, f1: 500, q: 0.8, attack: 1.4 });
+    tick(t + 2.4, 3200);
+  },
+  arr: (t) => {
+    // a riser, then one note as each bar lands (1.91s, 2.13s, 3.0s)
+    tone(200, t + 0.6, 2.4, {
+      gain: 0.1,
+      to: 800,
+      type: "triangle",
+      attack: 2.2,
+    });
+    [
+      [1.91, 261.63],
+      [2.13, 329.63],
+      [3.0, 392],
+    ].forEach(([d, f]) => {
+      tone(f, t + d, 1.6, { gain: 0.1, attack: 0.005, type: "triangle" });
+      tone(f / 2, t + d, 0.4, { gain: 0.2, to: f / 4, attack: 0.004 }); // thud as it lands
+    });
+    bellStrike(784, t + 3.0, 0.08);
+  },
+  end: (t) => {
+    // a warm chord to close
+    chord([220, 277.2, 329.6, 415.3, 554.4], t + 0.2, 5, 0.055);
+    noise(t, 2, { gain: 0.02, f0: 2000, f1: 6000, q: 0.9, attack: 1.4 });
+  },
+};
+
+function fadeCue() {
+  if (!cueBus) return;
+  const old = cueBus;
+  old.gain.setTargetAtTime(0, ac.currentTime, 0.08);
+  setTimeout(() => old.disconnect(), 800);
+  cueBus = null;
+}
+function cue(name) {
+  const c = audioCtx();
+  fadeCue(); // the previous chapter's sounds fade out
+  if (!CUES[name]) return;
+  cueBus = c.createGain();
+  cueBus.connect(duck);
+  // we waited ~100ms before starting, so shift the cue back to stay in step with the animation
+  CUES[name](c.currentTime - 0.1);
+}
+
+// the bell chapter's ring pulses every ~2.9s: give each pulse a soft low thump
+onPulse = () => {
+  if (!sfxOn || narrChapter !== "bell" || !cueBus || cur.tower < 0.9) return;
+  tone(98, ac.currentTime, 0.7, { gain: 0.1, to: 65, attack: 0.01 });
+};
+
+// turn the sound down while the narrator speaks
+const setDuck = (on) => {
+  if (ac) duck.gain.setTargetAtTime(on ? 0.45 : 1, ac.currentTime, 0.25);
+};
+voice.addEventListener("play", () => setDuck(true));
+voice.addEventListener("pause", () => setDuck(false));
+voice.addEventListener("ended", () => setDuck(false));
+
+// buttons (these listeners run after the narration button's own, so narrOn is already updated)
+function syncSfx() {
+  sfxOn = narrOn && sfxWanted;
+  sfxBtn.hidden = !narrOn;
+  sfxBtn.setAttribute("aria-pressed", String(sfxWanted));
+  if (sfxOn) cue(narrChapter);
+  else if (ac) fadeCue();
+}
+narrBtn.addEventListener("click", syncSfx);
+sfxBtn.addEventListener("click", () => {
+  sfxWanted = !sfxWanted;
+  syncSfx();
+});
+narrAgain.addEventListener("click", () => {
+  if (sfxOn) cue(narrChapter);
+});
+document.addEventListener("visibilitychange", () => {
+  if (!ac) return;
+  if (document.hidden) ac.suspend();
+  else if (sfxOn) ac.resume();
 });
 
 /* ---------- 3c. Chapter dots: click to jump to any chapter ---------- */
@@ -703,6 +960,10 @@ function go(s) {
   setState(s.dataset.s);
   narrChapter = s.dataset.s;
   setDot(s.dataset.s);
+  if (sfxOn) {
+    clearTimeout(sfxT);
+    sfxT = setTimeout(() => cue(narrChapter), 100); // short wait so fast scrolling doesn't machine-gun sounds
+  }
   if (narrOn) {
     // wait a moment so fast scrolling past a chapter doesn't start its clip
     clearTimeout(narrT);
