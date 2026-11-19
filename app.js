@@ -184,8 +184,194 @@ const [arrFloor, arrFloorM] = mkFloor(3.8);
 arrG.add(arrFloor);
 liqG.visible = arrG.visible = false;
 
+/* ---------- November update: off-hours ring, earnings towers, "priced by Pyth" gauges ---------- */
+// Off-hours share: a ring of beads that fills clockwise from the bottom, so 50% lands at 12 o'clock
+const OFF = [0.417, 0.498, 0.515]; // Sep, Oct, 1-13 Nov
+const OFF_N = 240,
+  OFF_R = 2;
+const offAng = (i) => -Math.PI / 2 - (i / OFF_N) * Math.PI * 2;
+const offPos = new Float32Array(OFF_N * 3),
+  offCol = new Float32Array(OFF_N * 3);
+for (let i = 0; i < OFF_N; i++) {
+  offPos.set(
+    [Math.cos(offAng(i)) * OFF_R, Math.sin(offAng(i)) * OFF_R, 0],
+    i * 3,
+  );
+  offCol.set(i < OFF_N / 2 ? [0.73, 0.4, 1] : [1, 0.8, 0], i * 3); // purple, then yellow once past halfway
+}
+const offG = new THREE.Group();
+grp.add(offG);
+const offBaseM = new THREE.PointsMaterial({
+  size: 0.06,
+  color: 0x8888aa,
+  transparent: true,
+});
+const offBaseG = new THREE.BufferGeometry();
+offBaseG.setAttribute("position", new THREE.BufferAttribute(offPos, 3));
+offG.add(new THREE.Points(offBaseG, offBaseM));
+const offFillM = new THREE.PointsMaterial({
+  size: 0.12,
+  vertexColors: true,
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+const offFillG = new THREE.BufferGeometry();
+offFillG.setAttribute("position", new THREE.BufferAttribute(offPos, 3));
+offFillG.setAttribute("color", new THREE.BufferAttribute(offCol, 3));
+offG.add(new THREE.Points(offFillG, offFillM));
+const offHead = new THREE.Mesh(
+  new THREE.SphereGeometry(0.13, 12, 12),
+  new THREE.MeshBasicMaterial({ color: 0xffffff }),
+); // bright bead at the front of the fill
+offG.add(offHead);
+const offMark = new THREE.Mesh(
+  new THREE.BoxGeometry(0.035, 0.55, 0.035),
+  new THREE.MeshBasicMaterial({ color: 0xffffff }),
+);
+offMark.position.set(0, OFF_R, 0); // the 50% line
+offG.add(offMark);
+offG.visible = false;
+// The live percentage in the middle of the ring: text is drawn on a canvas, then shown as a sprite
+const numCv = document.createElement("canvas");
+numCv.width = 512;
+numCv.height = 256;
+const numCtx = numCv.getContext("2d");
+const numTex = new THREE.CanvasTexture(numCv);
+const numMat = new THREE.SpriteMaterial({
+  map: numTex,
+  transparent: true,
+  depthTest: false,
+});
+const offNum = new THREE.Sprite(numMat);
+offNum.position.set(0, 0, 0.1);
+offG.add(offNum);
+const numPop = { s: 1 }; // scale "pop" when the ring crosses 50%
+let numKey = "",
+  offCrossed = false;
+function drawNum(txt, label, hot) {
+  const key = txt + "|" + label + "|" + hot;
+  if (key === numKey) return; // only redraw when something changed
+  numKey = key;
+  numCtx.clearRect(0, 0, 512, 256);
+  numCtx.textAlign = "center";
+  numCtx.textBaseline = "middle";
+  numCtx.fillStyle = hot ? "#ffcc00" : "#ffffff"; // turns yellow once past halfway, like the beads
+  numCtx.font = "700 120px Outfit, system-ui, sans-serif";
+  numCtx.fillText(txt, 256, 110);
+  numCtx.fillStyle = "#c9c9d6";
+  numCtx.font = "300 38px Outfit, system-ui, sans-serif";
+  numCtx.fillText(label, 256, 195);
+  numTex.needsUpdate = true;
+}
+// Progress u (0-1) -> share. Each stage is [start, end, from, to, easing]. Two timetables share one tween:
+// a quick one, and one paced to the narration (September lands as "forty-one point seven percent" ends, etc.)
+const smooth = (x) => x * x * (3 - 2 * x);
+const OFF_FAST = [
+  [0, 0.3, 0, OFF[0], smooth],
+  [0.42, 0.7, OFF[0], OFF[1], smooth],
+  [0.8, 0.95, OFF[1], OFF[2], smooth],
+];
+const OFF_SYNC = [
+  [0.1417, 0.375, 0, OFF[0], smooth],
+  [0.4167, 0.6083, OFF[0], OFF[1], smooth],
+  [0.8167, 1, OFF[1], OFF[2], (x) => x * x * x], // ease-in: crosses 50% late, so the pop lands on "fifty-one"
+];
+let syncMode = false; // true while a narrated chapter is playing on the narration-paced timetable
+function offFrac(u) {
+  let v = 0;
+  for (const [a, b, from, to, ease] of syncMode ? OFF_SYNC : OFF_FAST)
+    if (u >= a) v = from + (to - from) * ease(Math.min((u - a) / (b - a), 1));
+  return v;
+}
+
+// Earnings: for each of Apple and AMD, a tall bar (the first post-market hour) beside a 1x stub (a typical hour)
+const EARN = [114, 132], // "about 114x" and "about 132x"
+  EARN_U = 0.022; // world height of 1x
+const earnG = new THREE.Group();
+earnG.position.y = BASE_Y;
+grp.add(earnG);
+const earnBars = [],
+  earnStubs = [],
+  earnMs = [];
+[
+  [-1.55, -0.75],
+  [0.55, 1.35],
+].forEach(([xTower, xStub]) => {
+  const [tower, tm] = mkBar(0xffcc00),
+    [stubBar, sm2] = mkBar(0xc9c9d6);
+  tower.position.x = xTower;
+  stubBar.position.x = xStub;
+  tower.scale.x = tower.scale.z = stubBar.scale.x = stubBar.scale.z = 0.7;
+  earnG.add(tower, stubBar);
+  earnBars.push(tower);
+  earnStubs.push(stubBar);
+  earnMs.push(tm, sm2);
+});
+const [earnFloor, earnFloorM] = mkFloor(4.4);
+earnG.add(earnFloor);
+earnG.visible = false;
+
+// Narration-paced timetables, in chapter seconds: [tower start, tower end, stub start, stub end] for Apple and AMD,
+// and [start, end] for each gauge. The tweens that drive them last EARN_D / SHARE_D seconds (after a 0.6s delay).
+const EARN_T = [
+  [4.95, 7.9, 11.7, 12.2],
+  [15.35, 17.75, 19.5, 20.0],
+];
+const SHARE_T = [
+  [7.95, 9.65],
+  [16.45, 18.55],
+  [23.95, 25.75],
+];
+const EARN_D = 19.6,
+  SHARE_D = 25.5;
+const ramp = (t, s, e) => smooth(Math.min(Math.max((t - s) / (e - s), 0), 1));
+
+// Priced by Pyth: three frames (100% of the volume) with a fill up to Pyth's share
+const SHARE = [95.9, 92.15, 93.9],
+  SH_H = 3;
+const shareG = new THREE.Group();
+shareG.position.y = BASE_Y;
+grp.add(shareG);
+const shareFills = [],
+  shareMs = [];
+const shareFrameM = new THREE.LineBasicMaterial({
+  color: 0xc9c9d6,
+  transparent: true,
+});
+[0x9a58d6, 0xbb66ff, 0xd9a8ff].forEach((c, i) => {
+  const x = (i - 1) * 1.2;
+  const [fill, m] = mkBar(c);
+  fill.position.x = x;
+  fill.scale.x = fill.scale.z = 0.9; // a touch inside the frame
+  const frame = new THREE.LineSegments(
+    new THREE.EdgesGeometry(
+      new THREE.BoxGeometry(0.8, SH_H, 0.8).translate(0, SH_H / 2, 0),
+    ),
+    shareFrameM,
+  );
+  frame.position.x = x;
+  shareG.add(fill, frame);
+  shareFills.push(fill);
+  shareMs.push(m);
+});
+const [shareFloor, shareFloorM] = mkFloor(4);
+shareG.add(shareFloor);
+shareG.visible = false;
+
 // Defaults for every chapter-specific key, so older chapters hide these objects automatically
-const ZERO = { bell: 0, arc: 0, tower: 0, liq: 0, arr: 0, lift: 0 };
+const ZERO = {
+  bell: 0,
+  arc: 0,
+  tower: 0,
+  liq: 0,
+  arr: 0,
+  lift: 0,
+  offv: 0,
+  offh: 0,
+  earn: 0,
+  share: 0,
+};
 
 // Each chapter is just a set of target numbers. GSAP tweens "cur" toward them.
 const S = {
@@ -326,6 +512,52 @@ const S = {
     arr: 1,
     lift: 1.2,
   },
+  offh: {
+    x: 2.4,
+    cube: 0,
+    core: 0,
+    shield: 0,
+    stream: 0,
+    ex: 0,
+    spread: 0,
+    shake: 0,
+    r: 0.73,
+    g: 0.4,
+    b: 1,
+    offv: 1,
+    offh: 1,
+    lift: 0.9, // phones: raise the ring so the 50% line clears the card
+  },
+  earn: {
+    x: -2.4,
+    cube: 0,
+    core: 0,
+    shield: 0,
+    stream: 0,
+    ex: 0,
+    spread: 0,
+    shake: 0,
+    r: 0.73,
+    g: 0.4,
+    b: 1,
+    earn: 1,
+    lift: 1.2,
+  },
+  share: {
+    x: 2.4,
+    cube: 0,
+    core: 0,
+    shield: 0,
+    stream: 0,
+    ex: 0,
+    spread: 0,
+    shake: 0,
+    r: 0.73,
+    g: 0.4,
+    b: 1,
+    share: 1,
+    lift: 1.2,
+  },
   end: {
     x: 0,
     cube: 0,
@@ -350,10 +582,30 @@ const SEQ = {
   arc: { delay: 1.4, dur: 3, ease: "power1.inOut" }, // ...then the night sweeps round
   liq: { delay: 0.6, dur: 1.6, ease: "power3.out" },
   arr: { delay: 0.6, dur: 2.4, ease: "power2.inOut" },
+  offh: { delay: 0.6, dur: 7, sync: 12, ease: "none" }, // linear: offFrac() shapes the stages and holds
+  earn: {
+    delay: 0.6,
+    dur: 2.6,
+    sync: EARN_D,
+    ease: "power2.inOut",
+    syncEase: "none",
+  },
+  share: {
+    delay: 0.6,
+    dur: 2.4,
+    sync: SHARE_D,
+    ease: "power2.inOut",
+    syncEase: "none",
+  },
 };
+const SYNCED = { offh: true, earn: true, share: true }; // chapters with a narration-paced timetable
 function setState(name) {
   last = name;
   const t = { ...ZERO, ...S[name] }; // missing keys fall back to 0
+  // Cancel EVERY pending tween first. A chapter you scrolled past quickly can still have a delayed
+  // tween waiting (e.g. a bar that should rise after 0.6s). Left alone, it would fire later and
+  // put that chapter's objects back on screen. This matters most when jumping with the dots.
+  gsap.killTweensOf(cur);
   const sh = t.shield;
   delete t.shield;
   const seq = {};
@@ -375,13 +627,17 @@ function setState(name) {
     ease: sh > cur.shield ? "elastic.out(1,0.5)" : "power2.out",
     overwrite: "auto",
   });
+  // if the narrator will speak over this chapter, use its narration-paced timetable
+  syncMode = !!(narrOn && CLIPS[name] && SYNCED[name]);
   for (const k in SEQ) {
-    const up = seq[k] > cur[k];
+    const up = seq[k] > cur[k],
+      s = SEQ[k],
+      sy = syncMode && s.sync && name === k;
     gsap.to(cur, {
       [k]: seq[k],
-      duration: up ? SEQ[k].dur : 0.4,
-      delay: up ? SEQ[k].delay : 0,
-      ease: up ? SEQ[k].ease : "power2.out",
+      duration: up ? (sy ? s.sync : s.dur) : 0.4,
+      delay: up ? s.delay : 0,
+      ease: up ? (sy ? s.syncEase || s.ease : s.ease) : "power2.out",
       overwrite: "auto",
     });
   }
@@ -456,6 +712,68 @@ function frame() {
     arrMs[i].opacity = 0.9 * Math.min(cur.arr, 1);
   });
   arrFloorM.opacity = 0.6 * Math.min(cur.arr, 1);
+  // --- November update ---
+  offG.visible = cur.offv > 0.01;
+  offBaseM.opacity = 0.4 * Math.min(cur.offv, 1);
+  offFillM.opacity = Math.min(cur.offv, 1);
+  const offShare = offFrac(cur.offh);
+  const oi = Math.floor(offShare * OFF_N); // how many beads are filled
+  offFillG.setDrawRange(0, oi);
+  offHead.visible = oi > 0;
+  offHead.position.set(
+    offPos[Math.max(oi - 1, 0) * 3],
+    offPos[Math.max(oi - 1, 0) * 3 + 1],
+    0,
+  );
+  // the number counts up with the ring, and the label follows the stage (Sep -> Oct -> 1 to 13 Nov)
+  const offTh = syncMode ? [0.4167, 0.8167] : [0.42, 0.8]; // when the label switches to October / November
+  const offLabel =
+    cur.offh < offTh[0]
+      ? "September"
+      : cur.offh < offTh[1]
+        ? "October"
+        : "1 to 13 November";
+  drawNum((offShare * 100).toFixed(1) + "%", offLabel, offShare >= 0.5);
+  if (offShare >= 0.5 && !offCrossed) {
+    offCrossed = true; // crossed halfway: a quick pop, in time with the bell strike
+    gsap.fromTo(
+      numPop,
+      { s: 1.35 },
+      { s: 1, duration: 0.7, ease: "back.out(3)", overwrite: true },
+    );
+  }
+  if (offShare < 0.5) offCrossed = false;
+  offNum.visible = oi > 0;
+  offNum.scale.set(3.2 * numPop.s, 1.6 * numPop.s, 1);
+  numMat.opacity = Math.min(cur.offv, 1);
+
+  earnG.visible = cur.earn > 0.001;
+  earnG.rotation.y = Math.sin(t * 0.4) * 0.35 * k;
+  const et = 0.6 + cur.earn * EARN_D; // chapter seconds, for the narration-paced timetable
+  EARN.forEach((v, i) => {
+    // quick: Apple first, then AMD. Narrated: each tower and stub has its own moment in EARN_T
+    const gT = syncMode
+      ? ramp(et, EARN_T[i][0], EARN_T[i][1])
+      : Math.min(Math.max(cur.earn * 1.5 - i * 0.4, 0), 1);
+    const gS = syncMode ? ramp(et, EARN_T[i][2], EARN_T[i][3]) : gT;
+    earnBars[i].scale.y = Math.max(gT * v * EARN_U, 1e-4);
+    earnStubs[i].scale.y = Math.max(gS * EARN_U, 1e-4);
+  });
+  earnMs.forEach((m) => (m.opacity = 0.9 * Math.min(cur.earn * 20, 1)));
+  earnFloorM.opacity = 0.6 * Math.min(cur.earn * 20, 1);
+
+  shareG.visible = cur.share > 0.001;
+  shareG.rotation.y = Math.sin(t * 0.4) * 0.35 * k;
+  const stt = 0.6 + cur.share * SHARE_D; // chapter seconds, for the narration-paced timetable
+  SHARE.forEach((v, i) => {
+    const g = syncMode
+      ? ramp(stt, SHARE_T[i][0], SHARE_T[i][1])
+      : Math.min(Math.max(cur.share * 1.6 - i * 0.3, 0), 1); // one gauge after another
+    shareFills[i].scale.y = Math.max(g * (v / 100) * SH_H, 1e-4);
+    shareMs[i].opacity = 0.9 * Math.min(cur.share * 20, 1);
+  });
+  shareFrameM.opacity = 0.7 * Math.min(cur.share * 20, 1);
+  shareFloorM.opacity = 0.6 * Math.min(cur.share * 20, 1);
   stM.opacity = cur.stream;
   for (let i = 0; i < N; i++) {
     const s = seed[i],
@@ -602,6 +920,9 @@ const CLIPS = {
   liq: "liq.mp3",
   arr: "arr.mp3",
   end: "end.mp3",
+  offh: "offh.mp3",
+  earn: "earn.mp3",
+  share: "share.mp3",
 };
 const FOLLOW = { end: "sources.mp3" }; // plays right after the recap clip
 
@@ -651,7 +972,9 @@ function stopVoice() {
 function setNarr(on) {
   narrOn = on;
   narrBtn.setAttribute("aria-pressed", String(on));
-  narrBtn.textContent = on ? "\u275A\u275A Sound on" : "\u25B6 Listen as you scroll";
+  narrBtn.textContent = on
+    ? "\u275A\u275A Sound on"
+    : "\u25B6 Listen as you scroll";
   narrAgain.hidden = !on;
   if (!on) stopVoice();
 }
@@ -744,7 +1067,9 @@ function bellStrike(f, t, gain) {
     [2.76, 0.5, 1.6],
     [5.4, 0.25, 1.1],
     [8.93, 0.12, 0.7],
-  ].forEach(([r, a, d]) => tone(f * r, t, d, { gain: gain * a, attack: 0.004 }));
+  ].forEach(([r, a, d]) =>
+    tone(f * r, t, d, { gain: gain * a, attack: 0.004 }),
+  );
 }
 const chord = (fs, t, dur, gain) =>
   fs.forEach((f, i) =>
@@ -858,6 +1183,156 @@ const CUES = {
       tone(f / 2, t + d, 0.4, { gain: 0.2, to: f / 4, attack: 0.004 }); // thud as it lands
     });
     bellStrike(784, t + 3.0, 0.08);
+  },
+  offh: (t) => {
+    if (syncMode) {
+      // paced to the narration (chapter seconds): a soft whoosh as each stage starts, a thud as September (5.1s)
+      // and October (7.9s) land, then tension builds through "from one to thirteen November" to the crossing at 11.5s
+      noise(t + 2.3, 0.8, {
+        gain: 0.03,
+        f0: 300,
+        f1: 1500,
+        q: 0.8,
+        attack: 0.4,
+      });
+      noise(t + 5.6, 0.8, {
+        gain: 0.03,
+        f0: 300,
+        f1: 1500,
+        q: 0.8,
+        attack: 0.4,
+      });
+      [5.1, 7.9].forEach((d) =>
+        tone(110, t + d, 0.5, { gain: 0.2, to: 60, attack: 0.004 }),
+      );
+      tone(140, t + 8.4, 3.1, {
+        gain: 0.1,
+        to: 620,
+        type: "triangle",
+        attack: 2.8,
+      });
+      noise(t + 8.4, 3.1, {
+        gain: 0.04,
+        f0: 300,
+        f1: 3500,
+        q: 0.8,
+        attack: 2.8,
+      });
+      let at = 8.4,
+        gap = 0.5;
+      while (at < 11.4) {
+        tick(t + at, 600 + (at - 8.4) * 100); // ticks that speed up
+        at += gap;
+        gap = Math.max(0.12, gap * 0.9);
+      }
+      bellStrike(659.25, t + 11.48, 0.2); // crosses halfway
+      chord([220, 277.2, 329.6, 440], t + 11.5, 3.5, 0.06);
+      return;
+    }
+    // quick version: tension builds to the moment the ring crosses 50% (6.4s)
+    tone(140, t + 0.6, 5.8, {
+      gain: 0.1,
+      to: 620,
+      type: "triangle",
+      attack: 5.4,
+    });
+    noise(t + 0.6, 5.8, { gain: 0.04, f0: 300, f1: 3500, q: 0.8, attack: 5.4 });
+    let at = 0.6,
+      gap = 0.5;
+    while (at < 6.3) {
+      tick(t + at, 600 + at * 60);
+      at += gap;
+      gap = Math.max(0.12, gap * 0.9);
+    }
+    [2.7, 5.5].forEach((d) =>
+      tone(110, t + d, 0.5, { gain: 0.2, to: 60, attack: 0.004 }),
+    );
+    bellStrike(659.25, t + 6.42, 0.2);
+    chord([220, 277.2, 329.6, 440], t + 6.45, 3.5, 0.06);
+  },
+  earn: (t) => {
+    if (syncMode) {
+      // each tower gets a riser while its amount is spoken and a strike as it tops out; each 1x stub gets a tiny tick
+      tone(120, t + 4.95, 2.9, {
+        gain: 0.13,
+        to: 700,
+        type: "triangle",
+        attack: 2.7,
+      });
+      noise(t + 4.95, 2.9, {
+        gain: 0.05,
+        f0: 300,
+        f1: 4000,
+        q: 0.8,
+        attack: 2.7,
+      });
+      bellStrike(523.25, t + 7.9, 0.16);
+      tick(t + 12.2, 3200);
+      tone(120, t + 15.35, 2.4, {
+        gain: 0.13,
+        to: 700,
+        type: "triangle",
+        attack: 2.2,
+      });
+      noise(t + 15.35, 2.4, {
+        gain: 0.05,
+        f0: 300,
+        f1: 4000,
+        q: 0.8,
+        attack: 2.2,
+      });
+      bellStrike(659.25, t + 17.75, 0.18);
+      tick(t + 20.0, 3200);
+      return;
+    }
+    // quick version: a riser, then a strike as each tower tops out (Apple 2.06s, AMD 2.53s)
+    tone(120, t + 0.6, 1.9, {
+      gain: 0.13,
+      to: 700,
+      type: "triangle",
+      attack: 1.7,
+    });
+    noise(t + 0.6, 1.9, { gain: 0.05, f0: 300, f1: 4000, q: 0.8, attack: 1.7 });
+    bellStrike(523.25, t + 2.06, 0.16);
+    bellStrike(659.25, t + 2.53, 0.18);
+    tick(t + 2.9, 3200);
+  },
+  share: (t) => {
+    if (syncMode) {
+      // a riser while each percentage is spoken, a note as that gauge fills, then a full chord
+      [
+        [7.95, 9.65, 392],
+        [16.45, 18.55, 493.88],
+        [23.95, 25.75, 587.33],
+      ].forEach(([s, e, f]) => {
+        tone(200, t + s, e - s, {
+          gain: 0.08,
+          to: 600,
+          type: "triangle",
+          attack: (e - s) * 0.9,
+        });
+        tone(f, t + e, 1.6, { gain: 0.1, attack: 0.005, type: "triangle" });
+        tone(f / 2, t + e, 0.4, { gain: 0.18, to: f / 4, attack: 0.004 }); // thud as it fills
+      });
+      chord([196, 246.94, 293.66, 392], t + 25.8, 3.5, 0.06);
+      return;
+    }
+    // quick version: a riser, then one note as each gauge fills (1.91s, 2.13s, 3.0s), then a full chord
+    tone(200, t + 0.6, 2.4, {
+      gain: 0.09,
+      to: 700,
+      type: "triangle",
+      attack: 2.2,
+    });
+    [
+      [1.91, 392],
+      [2.13, 493.88],
+      [3.0, 587.33],
+    ].forEach(([d, f]) => {
+      tone(f, t + d, 1.6, { gain: 0.1, attack: 0.005, type: "triangle" });
+      tone(f / 2, t + d, 0.4, { gain: 0.18, to: f / 4, attack: 0.004 });
+    });
+    chord([196, 246.94, 293.66, 392], t + 3.0, 3.5, 0.06);
   },
   end: (t) => {
     // a warm chord to close
