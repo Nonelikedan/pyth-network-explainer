@@ -175,12 +175,12 @@ const arrBars = [],
   arrMs = [];
 [0x7a4aa8, 0x9a58d6, 0xbb66ff].forEach((c, i) => {
   const [b, m] = mkBar(c);
-  b.position.x = (i - 1) * 1.1;
+  b.position.x = (i - 1) * 1.4;
   arrG.add(b);
   arrBars.push(b);
   arrMs.push(m);
 });
-const [arrFloor, arrFloorM] = mkFloor(3.8);
+const [arrFloor, arrFloorM] = mkFloor(4.6);
 arrG.add(arrFloor);
 liqG.visible = arrG.visible = false;
 
@@ -193,19 +193,12 @@ const offAng = (i) => -Math.PI / 2 - (i / OFF_N) * Math.PI * 2;
 const offPos = new Float32Array(OFF_N * 3),
   offCol = new Float32Array(OFF_N * 3);
 for (let i = 0; i < OFF_N; i++) {
-  offPos.set(
-    [Math.cos(offAng(i)) * OFF_R, Math.sin(offAng(i)) * OFF_R, 0],
-    i * 3,
-  );
+  offPos.set([Math.cos(offAng(i)) * OFF_R, Math.sin(offAng(i)) * OFF_R, 0], i * 3);
   offCol.set(i < OFF_N / 2 ? [0.73, 0.4, 1] : [1, 0.8, 0], i * 3); // purple, then yellow once past halfway
 }
 const offG = new THREE.Group();
 grp.add(offG);
-const offBaseM = new THREE.PointsMaterial({
-  size: 0.06,
-  color: 0x8888aa,
-  transparent: true,
-});
+const offBaseM = new THREE.PointsMaterial({ size: 0.06, color: 0x8888aa, transparent: true });
 const offBaseG = new THREE.BufferGeometry();
 offBaseG.setAttribute("position", new THREE.BufferAttribute(offPos, 3));
 offG.add(new THREE.Points(offBaseG, offBaseM));
@@ -238,11 +231,7 @@ numCv.width = 512;
 numCv.height = 256;
 const numCtx = numCv.getContext("2d");
 const numTex = new THREE.CanvasTexture(numCv);
-const numMat = new THREE.SpriteMaterial({
-  map: numTex,
-  transparent: true,
-  depthTest: false,
-});
+const numMat = new THREE.SpriteMaterial({ map: numTex, transparent: true, depthTest: false });
 const offNum = new THREE.Sprite(numMat);
 offNum.position.set(0, 0, 0.1);
 offG.add(offNum);
@@ -257,10 +246,10 @@ function drawNum(txt, label, hot) {
   numCtx.textAlign = "center";
   numCtx.textBaseline = "middle";
   numCtx.fillStyle = hot ? "#ffcc00" : "#ffffff"; // turns yellow once past halfway, like the beads
-  numCtx.font = "700 120px Outfit, system-ui, sans-serif";
+  numCtx.font = '700 120px Outfit, system-ui, sans-serif';
   numCtx.fillText(txt, 256, 110);
   numCtx.fillStyle = "#c9c9d6";
-  numCtx.font = "300 38px Outfit, system-ui, sans-serif";
+  numCtx.font = '300 38px Outfit, system-ui, sans-serif';
   numCtx.fillText(label, 256, 195);
   numTex.needsUpdate = true;
 }
@@ -335,19 +324,14 @@ shareG.position.y = BASE_Y;
 grp.add(shareG);
 const shareFills = [],
   shareMs = [];
-const shareFrameM = new THREE.LineBasicMaterial({
-  color: 0xc9c9d6,
-  transparent: true,
-});
+const shareFrameM = new THREE.LineBasicMaterial({ color: 0xc9c9d6, transparent: true });
 [0x9a58d6, 0xbb66ff, 0xd9a8ff].forEach((c, i) => {
-  const x = (i - 1) * 1.2;
+  const x = (i - 1) * 1.45;
   const [fill, m] = mkBar(c);
   fill.position.x = x;
   fill.scale.x = fill.scale.z = 0.9; // a touch inside the frame
   const frame = new THREE.LineSegments(
-    new THREE.EdgesGeometry(
-      new THREE.BoxGeometry(0.8, SH_H, 0.8).translate(0, SH_H / 2, 0),
-    ),
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(0.8, SH_H, 0.8).translate(0, SH_H / 2, 0)),
     shareFrameM,
   );
   frame.position.x = x;
@@ -355,23 +339,88 @@ const shareFrameM = new THREE.LineBasicMaterial({
   shareFills.push(fill);
   shareMs.push(m);
 });
-const [shareFloor, shareFloorM] = mkFloor(4);
+const [shareFloor, shareFloorM] = mkFloor(4.9);
 shareG.add(shareFloor);
 shareG.visible = false;
 
+/* ---------- Bar decorations: a Pyth badge on each bar, and a number above it that counts up as the bar rises ---------- */
+// The badge is the logo from the page, cropped to a circle (drawn once the image has loaded)
+const badgeCv = document.createElement("canvas");
+badgeCv.width = badgeCv.height = 256;
+const badgeTex = new THREE.CanvasTexture(badgeCv);
+{
+  const img = new Image();
+  img.onload = () => {
+    const c = badgeCv.getContext("2d");
+    c.clearRect(0, 0, 256, 256);
+    c.save();
+    c.beginPath();
+    c.arc(128, 128, 120, 0, Math.PI * 2);
+    c.clip();
+    c.drawImage(img, 0, 0, 256, 256);
+    c.restore();
+    c.lineWidth = 10;
+    c.strokeStyle = "rgba(187, 102, 255, 0.95)";
+    c.beginPath();
+    c.arc(128, 128, 122, 0, Math.PI * 2);
+    c.stroke();
+    badgeTex.needsUpdate = true;
+  };
+  const logo = document.querySelector(".logo");
+  if (logo) img.src = logo.src;
+}
+// One badge + one number label per bar. They are separate from the bar (a bar's height is its scale,
+// which would squash anything attached to it), so showDecor() repositions them every frame.
+function decorate(group, bar, w = 1.5) {
+  const badge = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ map: badgeTex, transparent: true, depthWrite: false, side: THREE.DoubleSide }),
+  );
+  const size = Math.min(0.8 * bar.scale.x * 0.75, 0.5);
+  badge.scale.set(size, size, 1);
+  const cv = document.createElement("canvas");
+  cv.width = 256;
+  cv.height = 128;
+  const tex = new THREE.CanvasTexture(cv);
+  const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  label.scale.set(w, w / 2, 1);
+  badge.visible = label.visible = false;
+  group.add(badge, label);
+  return { bar, badge, label, ctx: cv.getContext("2d"), tex, z: 0.4 * bar.scale.z + 0.006, last: "" };
+}
+// h = the bar's height now, g = how far it has risen (0-1), line1 = the counting number, line2 = what it is
+function showDecor(d, h, g, line1, line2, logo = true) {
+  const on = g > 0.02;
+  d.label.visible = on;
+  d.badge.visible = on && logo && h > 0.8; // no badge on a thin stub
+  if (!on) return;
+  d.label.position.set(d.bar.position.x, h + 0.45, 0.2);
+  d.label.material.opacity = Math.min(g * 5, 1);
+  d.badge.position.set(d.bar.position.x, h * 0.5, d.z);
+  if (line1 + line2 === d.last) return; // only redraw when the text changes
+  d.last = line1 + line2;
+  const c = d.ctx;
+  c.clearRect(0, 0, 256, 128);
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.fillStyle = "#ffffff";
+  c.font = "700 64px Outfit, system-ui, sans-serif";
+  c.fillText(line1, 128, 52, 244);
+  c.fillStyle = "#c9c9d6";
+  c.font = "400 34px Outfit, system-ui, sans-serif";
+  c.fillText(line2, 128, 100, 244);
+  d.tex.needsUpdate = true;
+}
+const liqD = [decorate(liqG, perps), decorate(liqG, spot)];
+const arrD = arrBars.map((b) => decorate(arrG, b, 1.25));
+const earnD = earnBars.map((b) => decorate(earnG, b));
+const shareD = shareFills.map((b) => decorate(shareG, b, 1.25));
+// the canvas text can't use Outfit until it has loaded: redraw everything once it has
+if (document.fonts)
+  document.fonts.load("700 64px Outfit").then(() => [...liqD, ...arrD, ...earnD, ...shareD].forEach((d) => (d.last = "")));
+
 // Defaults for every chapter-specific key, so older chapters hide these objects automatically
-const ZERO = {
-  bell: 0,
-  arc: 0,
-  tower: 0,
-  liq: 0,
-  arr: 0,
-  lift: 0,
-  offv: 0,
-  offh: 0,
-  earn: 0,
-  share: 0,
-};
+const ZERO = { bell: 0, arc: 0, tower: 0, liq: 0, arr: 0, lift: 0, offv: 0, offh: 0, earn: 0, share: 0 };
 
 // Each chapter is just a set of target numbers. GSAP tweens "cur" toward them.
 const S = {
@@ -583,20 +632,8 @@ const SEQ = {
   liq: { delay: 0.6, dur: 1.6, ease: "power3.out" },
   arr: { delay: 0.6, dur: 2.4, ease: "power2.inOut" },
   offh: { delay: 0.6, dur: 7, sync: 12, ease: "none" }, // linear: offFrac() shapes the stages and holds
-  earn: {
-    delay: 0.6,
-    dur: 2.6,
-    sync: EARN_D,
-    ease: "power2.inOut",
-    syncEase: "none",
-  },
-  share: {
-    delay: 0.6,
-    dur: 2.4,
-    sync: SHARE_D,
-    ease: "power2.inOut",
-    syncEase: "none",
-  },
+  earn: { delay: 0.6, dur: 2.6, sync: EARN_D, ease: "power2.inOut", syncEase: "none" },
+  share: { delay: 0.6, dur: 2.4, sync: SHARE_D, ease: "power2.inOut", syncEase: "none" },
 };
 const SYNCED = { offh: true, earn: true, share: true }; // chapters with a narration-paced timetable
 function setState(name) {
@@ -701,6 +738,8 @@ function frame() {
   liqG.rotation.y = Math.sin(t * 0.4) * 0.35 * k;
   perps.scale.y = Math.max(cur.liq * LIQ_H, 1e-4);
   spot.scale.y = Math.max(cur.liq * LIQ_H * (1.95 / 122.1), 1e-4);
+  showDecor(liqD[0], perps.scale.y, cur.liq, "$" + (122.1 * cur.liq).toFixed(1) + "B", "US stock perps");
+  showDecor(liqD[1], spot.scale.y, cur.liq, "$" + (1.95 * cur.liq).toFixed(2) + "B", "tokenized spot", false);
   perpsM.opacity = spotM.opacity = 0.9 * Math.min(cur.liq, 1);
   liqFloorM.opacity = 0.6 * Math.min(cur.liq, 1);
   // --- The Business of Data: ARR bars, starting from zero ---
@@ -709,6 +748,7 @@ function frame() {
   ARR.forEach((v, i) => {
     const g = Math.min(Math.max(cur.arr * 1.6 - i * 0.3, 0), 1); // bars rise one after another
     arrBars[i].scale.y = Math.max(g * v * ARR_U, 1e-4);
+    showDecor(arrD[i], arrBars[i].scale.y, g, "$" + (v * g).toFixed(2) + "M", ["Aug", "Sep", "Oct"][i]);
     arrMs[i].opacity = 0.9 * Math.min(cur.arr, 1);
   });
   arrFloorM.opacity = 0.6 * Math.min(cur.arr, 1);
@@ -720,44 +760,31 @@ function frame() {
   const oi = Math.floor(offShare * OFF_N); // how many beads are filled
   offFillG.setDrawRange(0, oi);
   offHead.visible = oi > 0;
-  offHead.position.set(
-    offPos[Math.max(oi - 1, 0) * 3],
-    offPos[Math.max(oi - 1, 0) * 3 + 1],
-    0,
-  );
+  offHead.position.set(offPos[Math.max(oi - 1, 0) * 3], offPos[Math.max(oi - 1, 0) * 3 + 1], 0);
   // the number counts up with the ring, and the label follows the stage (Sep -> Oct -> 1 to 13 Nov)
   const offTh = syncMode ? [0.4167, 0.8167] : [0.42, 0.8]; // when the label switches to October / November
-  const offLabel =
-    cur.offh < offTh[0]
-      ? "September"
-      : cur.offh < offTh[1]
-        ? "October"
-        : "1 to 13 November";
+  const offLabel = cur.offh < offTh[0] ? "September" : cur.offh < offTh[1] ? "October" : "1 to 13 November";
   drawNum((offShare * 100).toFixed(1) + "%", offLabel, offShare >= 0.5);
   if (offShare >= 0.5 && !offCrossed) {
     offCrossed = true; // crossed halfway: a quick pop, in time with the bell strike
-    gsap.fromTo(
-      numPop,
-      { s: 1.35 },
-      { s: 1, duration: 0.7, ease: "back.out(3)", overwrite: true },
-    );
+    gsap.fromTo(numPop, { s: 1.35 }, { s: 1, duration: 0.7, ease: "back.out(3)", overwrite: true });
   }
   if (offShare < 0.5) offCrossed = false;
   offNum.visible = oi > 0;
   offNum.scale.set(3.2 * numPop.s, 1.6 * numPop.s, 1);
   numMat.opacity = Math.min(cur.offv, 1);
 
+
   earnG.visible = cur.earn > 0.001;
   earnG.rotation.y = Math.sin(t * 0.4) * 0.35 * k;
   const et = 0.6 + cur.earn * EARN_D; // chapter seconds, for the narration-paced timetable
   EARN.forEach((v, i) => {
     // quick: Apple first, then AMD. Narrated: each tower and stub has its own moment in EARN_T
-    const gT = syncMode
-      ? ramp(et, EARN_T[i][0], EARN_T[i][1])
-      : Math.min(Math.max(cur.earn * 1.5 - i * 0.4, 0), 1);
+    const gT = syncMode ? ramp(et, EARN_T[i][0], EARN_T[i][1]) : Math.min(Math.max(cur.earn * 1.5 - i * 0.4, 0), 1);
     const gS = syncMode ? ramp(et, EARN_T[i][2], EARN_T[i][3]) : gT;
     earnBars[i].scale.y = Math.max(gT * v * EARN_U, 1e-4);
     earnStubs[i].scale.y = Math.max(gS * EARN_U, 1e-4);
+    showDecor(earnD[i], earnBars[i].scale.y, gT, "$" + ([188.6, 192.4][i] * gT).toFixed(1) + "M", "\u2248" + Math.round(v * gT) + "\u00d7 " + ["Apple", "AMD"][i]);
   });
   earnMs.forEach((m) => (m.opacity = 0.9 * Math.min(cur.earn * 20, 1)));
   earnFloorM.opacity = 0.6 * Math.min(cur.earn * 20, 1);
@@ -770,6 +797,7 @@ function frame() {
       ? ramp(stt, SHARE_T[i][0], SHARE_T[i][1])
       : Math.min(Math.max(cur.share * 1.6 - i * 0.3, 0), 1); // one gauge after another
     shareFills[i].scale.y = Math.max(g * (v / 100) * SH_H, 1e-4);
+    showDecor(shareD[i], shareFills[i].scale.y, g, (v * g).toFixed([1, 2, 1][i]) + "%", ["Oct \u00b7 equity", "1\u201313 Nov", "Last 24h"][i]);
     shareMs[i].opacity = 0.9 * Math.min(cur.share * 20, 1);
   });
   shareFrameM.opacity = 0.7 * Math.min(cur.share * 20, 1);
@@ -972,9 +1000,7 @@ function stopVoice() {
 function setNarr(on) {
   narrOn = on;
   narrBtn.setAttribute("aria-pressed", String(on));
-  narrBtn.textContent = on
-    ? "\u275A\u275A Sound on"
-    : "\u25B6 Listen as you scroll";
+  narrBtn.textContent = on ? "\u275A\u275A Sound on" : "\u25B6 Listen as you scroll";
   narrAgain.hidden = !on;
   if (!on) stopVoice();
 }
@@ -1067,9 +1093,7 @@ function bellStrike(f, t, gain) {
     [2.76, 0.5, 1.6],
     [5.4, 0.25, 1.1],
     [8.93, 0.12, 0.7],
-  ].forEach(([r, a, d]) =>
-    tone(f * r, t, d, { gain: gain * a, attack: 0.004 }),
-  );
+  ].forEach(([r, a, d]) => tone(f * r, t, d, { gain: gain * a, attack: 0.004 }));
 }
 const chord = (fs, t, dur, gain) =>
   fs.forEach((f, i) =>
@@ -1188,36 +1212,11 @@ const CUES = {
     if (syncMode) {
       // paced to the narration (chapter seconds): a soft whoosh as each stage starts, a thud as September (5.1s)
       // and October (7.9s) land, then tension builds through "from one to thirteen November" to the crossing at 11.5s
-      noise(t + 2.3, 0.8, {
-        gain: 0.03,
-        f0: 300,
-        f1: 1500,
-        q: 0.8,
-        attack: 0.4,
-      });
-      noise(t + 5.6, 0.8, {
-        gain: 0.03,
-        f0: 300,
-        f1: 1500,
-        q: 0.8,
-        attack: 0.4,
-      });
-      [5.1, 7.9].forEach((d) =>
-        tone(110, t + d, 0.5, { gain: 0.2, to: 60, attack: 0.004 }),
-      );
-      tone(140, t + 8.4, 3.1, {
-        gain: 0.1,
-        to: 620,
-        type: "triangle",
-        attack: 2.8,
-      });
-      noise(t + 8.4, 3.1, {
-        gain: 0.04,
-        f0: 300,
-        f1: 3500,
-        q: 0.8,
-        attack: 2.8,
-      });
+      noise(t + 2.3, 0.8, { gain: 0.03, f0: 300, f1: 1500, q: 0.8, attack: 0.4 });
+      noise(t + 5.6, 0.8, { gain: 0.03, f0: 300, f1: 1500, q: 0.8, attack: 0.4 });
+      [5.1, 7.9].forEach((d) => tone(110, t + d, 0.5, { gain: 0.2, to: 60, attack: 0.004 }));
+      tone(140, t + 8.4, 3.1, { gain: 0.1, to: 620, type: "triangle", attack: 2.8 });
+      noise(t + 8.4, 3.1, { gain: 0.04, f0: 300, f1: 3500, q: 0.8, attack: 2.8 });
       let at = 8.4,
         gap = 0.5;
       while (at < 11.4) {
@@ -1230,12 +1229,7 @@ const CUES = {
       return;
     }
     // quick version: tension builds to the moment the ring crosses 50% (6.4s)
-    tone(140, t + 0.6, 5.8, {
-      gain: 0.1,
-      to: 620,
-      type: "triangle",
-      attack: 5.4,
-    });
+    tone(140, t + 0.6, 5.8, { gain: 0.1, to: 620, type: "triangle", attack: 5.4 });
     noise(t + 0.6, 5.8, { gain: 0.04, f0: 300, f1: 3500, q: 0.8, attack: 5.4 });
     let at = 0.6,
       gap = 0.5;
@@ -1244,54 +1238,25 @@ const CUES = {
       at += gap;
       gap = Math.max(0.12, gap * 0.9);
     }
-    [2.7, 5.5].forEach((d) =>
-      tone(110, t + d, 0.5, { gain: 0.2, to: 60, attack: 0.004 }),
-    );
+    [2.7, 5.5].forEach((d) => tone(110, t + d, 0.5, { gain: 0.2, to: 60, attack: 0.004 }));
     bellStrike(659.25, t + 6.42, 0.2);
     chord([220, 277.2, 329.6, 440], t + 6.45, 3.5, 0.06);
   },
   earn: (t) => {
     if (syncMode) {
       // each tower gets a riser while its amount is spoken and a strike as it tops out; each 1x stub gets a tiny tick
-      tone(120, t + 4.95, 2.9, {
-        gain: 0.13,
-        to: 700,
-        type: "triangle",
-        attack: 2.7,
-      });
-      noise(t + 4.95, 2.9, {
-        gain: 0.05,
-        f0: 300,
-        f1: 4000,
-        q: 0.8,
-        attack: 2.7,
-      });
+      tone(120, t + 4.95, 2.9, { gain: 0.13, to: 700, type: "triangle", attack: 2.7 });
+      noise(t + 4.95, 2.9, { gain: 0.05, f0: 300, f1: 4000, q: 0.8, attack: 2.7 });
       bellStrike(523.25, t + 7.9, 0.16);
       tick(t + 12.2, 3200);
-      tone(120, t + 15.35, 2.4, {
-        gain: 0.13,
-        to: 700,
-        type: "triangle",
-        attack: 2.2,
-      });
-      noise(t + 15.35, 2.4, {
-        gain: 0.05,
-        f0: 300,
-        f1: 4000,
-        q: 0.8,
-        attack: 2.2,
-      });
+      tone(120, t + 15.35, 2.4, { gain: 0.13, to: 700, type: "triangle", attack: 2.2 });
+      noise(t + 15.35, 2.4, { gain: 0.05, f0: 300, f1: 4000, q: 0.8, attack: 2.2 });
       bellStrike(659.25, t + 17.75, 0.18);
       tick(t + 20.0, 3200);
       return;
     }
     // quick version: a riser, then a strike as each tower tops out (Apple 2.06s, AMD 2.53s)
-    tone(120, t + 0.6, 1.9, {
-      gain: 0.13,
-      to: 700,
-      type: "triangle",
-      attack: 1.7,
-    });
+    tone(120, t + 0.6, 1.9, { gain: 0.13, to: 700, type: "triangle", attack: 1.7 });
     noise(t + 0.6, 1.9, { gain: 0.05, f0: 300, f1: 4000, q: 0.8, attack: 1.7 });
     bellStrike(523.25, t + 2.06, 0.16);
     bellStrike(659.25, t + 2.53, 0.18);
@@ -1305,12 +1270,7 @@ const CUES = {
         [16.45, 18.55, 493.88],
         [23.95, 25.75, 587.33],
       ].forEach(([s, e, f]) => {
-        tone(200, t + s, e - s, {
-          gain: 0.08,
-          to: 600,
-          type: "triangle",
-          attack: (e - s) * 0.9,
-        });
+        tone(200, t + s, e - s, { gain: 0.08, to: 600, type: "triangle", attack: (e - s) * 0.9 });
         tone(f, t + e, 1.6, { gain: 0.1, attack: 0.005, type: "triangle" });
         tone(f / 2, t + e, 0.4, { gain: 0.18, to: f / 4, attack: 0.004 }); // thud as it fills
       });
@@ -1318,12 +1278,7 @@ const CUES = {
       return;
     }
     // quick version: a riser, then one note as each gauge fills (1.91s, 2.13s, 3.0s), then a full chord
-    tone(200, t + 0.6, 2.4, {
-      gain: 0.09,
-      to: 700,
-      type: "triangle",
-      attack: 2.2,
-    });
+    tone(200, t + 0.6, 2.4, { gain: 0.09, to: 700, type: "triangle", attack: 2.2 });
     [
       [1.91, 392],
       [2.13, 493.88],
